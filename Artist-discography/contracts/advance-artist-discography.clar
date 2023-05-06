@@ -42,13 +42,17 @@
 (define-data-var admin (list 4 principal) (list tx-sender))
 
 ;; Map that keeps track of a single track
-(define-map single-track principal {title: (string-ascii 26), duration: uint, featured: (optional principal)})
+(define-map single-track {artist: principal, track-id: uint} {title: (string-ascii 26), duration: uint, featured: (optional principal), producer: (string-ascii 26)})
 
-;; Map that keeps track of a simple album
+;; Map that keeps track of a discography
+(define-map discography principal (list 30 uint))
+
+;; Map that keeps track of an album
 (define-map album {artist: principal, album-id: uint}
     {
         title: (string-ascii 26),
         tracks: (list 100 uint),
+        featured: (optional principal),
         height-published: uint,
         producer: (string-ascii 26)
     }
@@ -59,22 +63,24 @@
     {
         title: (string-ascii 26),
         tracks: (list 100 uint),
+        featured: (optional principal),
         height-published: uint,
         producer: (string-ascii 26)
     }
 )
 
 ;; Map that keeps track of an Ep
-(define-map ep-project principal {
+(define-map ep-project {artist: principal, ep-id: uint} {
     title: (string-ascii 26),
     tracks: (list 6 uint),
     featured: (optional principal),
     producer: (string-ascii 26)
 })
 
-;; Map that keeps track of a music-video
-(define-map music-video principal {
+;; Map that keeps track of a music videos
+(define-map music-video {artist: principal, vid-id: uint} {
     title: (string-ascii 26),
+    featured: (optional principal),
     duration: uint,
 })
 
@@ -85,10 +91,125 @@
     height-published: uint 
 })
 
-;; Map that tracks the producer of a song, Ep, and album
-(define-map producer principal {
-    title: (string-ascii 26),
-    track: (list 30 uint),
+;; Map that tracks the record label an artist releases a song, ep or album under
+(define-map record-label {artist: principal} {
+    album-name: (string-ascii 26),
+    label-name: (string-ascii 26),
+    year: uint
 })
 
+;; Map that keeps track of universal playlist artist is featured in
+(define-map featured-in {artist: principal} {
+    title: (string-ascii 26),
+    songs-featured: uint 
+})
 
+;;;;;;;;;;;;;;;;;;;;
+;; Read Functions ;;
+;;;;;;;;;;;;;;;;;;;;
+
+;; Get track data
+(define-read-only (get-track-data (artist principal) (track-id uint)) 
+    (map-get? single-track {artist: artist, track-id: track-id})
+)
+
+;; Get album-data
+(define-read-only (get-album-data (artist principal) (album-id uint)) 
+    (map-get? album {artist: artist, album-id: album-id})
+)
+
+;; Get deluxe album
+(define-read-only (get-deluxe-album (artist principal) (album-id uint)) 
+    (map-get? deluxe-album {artist: artist, album-id: album-id})
+)
+
+;; Get ep-projects
+(define-read-only (get-ep-project (artist principal) (ep-id uint)) 
+    (map-get? ep-project {artist: artist, ep-id: ep-id})
+)
+
+;; Get music videos
+(define-read-only (get-music-vidoes (artist principal) (vid-id uint)) 
+    (map-get? music-video {artist: artist, vid-id: vid-id})
+)
+
+;; Get live-albums
+(define-read-only (get-live-albums (artist principal) (album-id uint)) 
+    (map-get? live-album {artist: artist, album-id: album-id})
+)
+
+;; Get record-label
+(define-read-only (get-record-label (artist principal)) 
+    (map-get? record-label {artist: artist})
+)
+
+;; Get featured-in-playlist
+(define-read-only (get-featured-in (artist principal)) 
+    (map-get? featured-in {artist: artist})
+)
+
+;; Get discography
+(define-read-only (get-artist-discography (artist principal)) 
+    (map-get? discography artist)
+)
+
+
+;;;;;;;;;;;;;;;;;;;;;
+;; Write Functions ;;
+;;;;;;;;;;;;;;;;;;;;;
+
+;; Add a track
+;; @desc - Function  that allows a user or admin add a track
+;; @params - (title (string-ascii 26) (duration uint) featured-artist (optional) album-id (uint))
+(define-public (add-a-single-track (artist principal) (title (string-ascii 26)) (duration uint) (featured (optional principal)) (track-id uint) (producer (string-ascii 26))) 
+    (let    
+    
+        (
+            (current-artist-discography (unwrap! (map-get? discography artist) (err "err-no-discography-found")))
+            (current-single-track-id (unwrap! (index-of? current-artist-discography track-id) (err "err-track-id")))
+            (next-single-track-id (+ u1 current-single-track-id))
+        )
+
+            ;; Assert that tx-sender is admin or artist
+            (asserts! (or (is-eq tx-sender artist) (is-some (index-of? (var-get admin) tx-sender))) (err "err-not authorized"))
+
+            ;; Assert that duration is less than 600 (10mins)
+            (asserts! (< duration u600) (err "err-time-exceeded"))
+
+            ;; Map-set track by appending it to discography
+            (ok (map-set single-track {artist: artist, track-id: track-id} {
+                title: title,
+                duration: duration,
+                featured: featured,
+                producer: producer
+            }))
+            
+    )
+)
+
+;; Add album
+;; @desc - A function that allows an artist or admin add a new album or a strat a new discography
+(define-public (add-album-or-create-discography-and-add-album (artist principal) (album-id uint) ) 
+    (let         
+    
+        (
+            (current-artist-discography (default-to (list ) (map-get? discography artist)))
+            (current-album-id (len current-artist-discography))
+            (next-album-id (+ u1 current-album-id))
+        )
+
+            
+            (ok 1)
+    )
+)
+
+
+;; (define-map album {artist: principal, album-id: uint}
+;;     {
+;;         title: (string-ascii 26),
+;;         tracks: (list 100 uint),
+;;         featured: (optional principal),
+;;         height-published: uint,
+;;         producer: (string-ascii 26)
+;;     }
+;; )
